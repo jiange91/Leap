@@ -2515,7 +2515,7 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	}
 
 	delayacct_set_flag(DELAYACCT_PF_SWAPIN);
-	page = lookup_swap_cache(entry);
+	page = lookup_swap_cache_prof(entry, address);
 
 	if (!page) {
 		page = swapin_readahead(entry,

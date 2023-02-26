@@ -16,10 +16,13 @@ MODULE_DESCRIPTION("Kernel module to enable/disable Leap components");
 char *cmd;
 unsigned long tried = 0;
 char *process_name;
+int wds=32;
 MODULE_PARM_DESC(cmd, "A string, for prefetch load/unload command");
 module_param(cmd, charp, 0000);
 MODULE_PARM_DESC(process_name, "A string, for process name");
 module_param(process_name, charp, 0000);
+MODULE_PARM_DESC(wds, "A int, for prefethc window size");
+module_param(wds, int, 0);
 
 static int get_pid_for_process(void) {
 	int pid = -1;
@@ -60,9 +63,10 @@ static int process_find_init(void) {
 
 static void usage(void) {
         printk(KERN_INFO "To enable remote I/O data path: insmod leap_functionality.ko process_name=\"tunkrank\" cmd=\"init\"\n");
-        printk(KERN_INFO "To enable prefetching: insmod leap_functionality.ko cmd=\"prefetch\"\n");
+        printk(KERN_INFO "To enable prefetching: insmod leap_functionality.ko cmd=\"prefetch\" wds=\"N\"\n");
         printk(KERN_INFO "To disable prefetching: insmod leap_functionality.ko cmd=\"readahead\"\n");
         printk(KERN_INFO "To have swap info log: insmod leap_functionality.ko cmd=\"log\"\n");
+	printk(KERN_INFO "To check if current swap cache activates prefetch buffer: insmod leap_functionality.ko cmd=\"pbuf\"\n");
 }
 
 static int __init leap_functionality_init(void) {	
@@ -71,7 +75,7 @@ static int __init leap_functionality_init(void) {
 		return 0;
 	}
 	if(strcmp(cmd, "prefetch") == 0){
-		init_swap_trend(32);
+		init_swap_trend(wds);
 		set_custom_prefetch(1);
 		return 0;
 	}
@@ -80,7 +84,12 @@ static int __init leap_functionality_init(void) {
 		return 0;
 	}
 	else if(strcmp(cmd, "readahead") == 0){
+		init_swap_trend(0);
 		set_custom_prefetch(0);
+		return 0;
+	}
+	else if (strcmp(cmd, "pbuf") == 0) {
+		printk("prefetch buffer: %s\n", (get_prefetch_buffer_status() != 0) ? "active" : "inactive");
 		return 0;
 	}
 	else

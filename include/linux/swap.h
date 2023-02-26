@@ -413,6 +413,7 @@ extern struct page *__read_swap_cache_async(swp_entry_t, gfp_t,
 			bool *new_page_allocated);
 extern struct page *swapin_readahead(swp_entry_t, gfp_t,
 			struct vm_area_struct *vma, unsigned long addr);
+extern struct page *lookup_swap_cache_prof(swp_entry_t entry, unsigned long addr);
 
 /* linux/mm/swapfile.c */
 extern atomic_long_t nr_swap_pages;

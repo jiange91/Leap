@@ -19,6 +19,7 @@
 #include <linux/pagevec.h>
 #include <linux/migrate.h>
 
+#include <linux/page_idle.h>
 #include <asm/pgtable.h>
 
 /*
@@ -65,9 +66,25 @@ static atomic_t swapin_readahead_hits = ATOMIC_INIT(4);
 /* My code goes here */
 unsigned long is_custom_prefetch = 0;
 
-atomic_t my_swapin_readahead_hits = ATOMIC_INIT(0);
+atomic_t prefetch_hits = ATOMIC_INIT(0);
 atomic_t swapin_readahead_entry = ATOMIC_INIT(0);
 atomic_t trend_found = ATOMIC_INIT(0);
+
+static void* pref_interest_start = NULL;
+static void* pref_interest_end = NULL;
+static void* falt_interest_start = NULL;
+static void* falt_interest_end = NULL;
+
+static struct {
+	unsigned long total_target;
+	unsigned long fetched_pages;
+	unsigned long fetched_hit;
+
+	unsigned long prefetch_interest_hit;
+	unsigned long fault_interest;
+} prefetch_stat;
+
+#define INC_PREF_STAT(x) do { prefetch_stat.x ++; } while (0)
 
 void set_custom_prefetch(unsigned long val){
         is_custom_prefetch = val;
@@ -118,9 +135,21 @@ void init_stat(void) {
         swap_cache_info.find_success = 0;
         swap_cache_info.find_total = 0;
 
-        atomic_set(&my_swapin_readahead_hits, 0);
+	prefetch_stat.fetched_hit = 0;
+	prefetch_stat.fetched_pages = 0;
+	prefetch_stat.total_target = 0;
+	prefetch_stat.prefetch_interest_hit = 0;
+	prefetch_stat.fault_interest = 0;
+
+        atomic_set(&prefetch_hits, 0);
         atomic_set(&swapin_readahead_entry, 0);
         atomic_set(&trend_found, 0);
+	atomic_set(&swapin_readahead_hits, 4);
+}
+
+asmlinkage int sys_reset_swap_stat(void) {
+	init_stat();
+	return 0;
 }
 
 void init_swap_trend(int size) {
@@ -202,7 +231,7 @@ int find_trend (int *depth, long *major_delta, int *major_count) {
 void show_swap_cache_info(void)
 {
 	printk("%lu pages in swap cache\n", total_swapcache_pages());
-	printk("Swap cache stats: add %lu, delete %lu, find %lu/%lu\n",
+	printk("Swap cache stats: add %lu, delete %lu, find success/total: %lu, %lu\n",
 		swap_cache_info.add_total, swap_cache_info.del_total,
 		swap_cache_info.find_success, swap_cache_info.find_total);
 	printk("Free swap  = %ldkB\n",
@@ -212,7 +241,9 @@ void show_swap_cache_info(void)
 
 void swap_info_log(void){
 	show_swap_cache_info();
-	printk("\n\nmy_swapin_readahead_hits: %d, trend_found: %d, swapin_readahead_entry: %d\n", atomic_read(&my_swapin_readahead_hits), atomic_read(&trend_found), atomic_read(&swapin_readahead_entry));
+	printk("\n\ntrend_found: %d, swapin_readahead_entry: %d\n", atomic_read(&trend_found), atomic_read(&swapin_readahead_entry));
+	printk("total hit/target: %d, %lu\nfetched hit/target: %lu, %lu\n", atomic_read(&prefetch_hits), prefetch_stat.total_target, prefetch_stat.fetched_hit, prefetch_stat.fetched_pages);
+	printk("fault interest: %lu, prefetch interest hit: %lu\n", prefetch_stat.fault_interest, prefetch_stat.prefetch_interest_hit);
 }
 EXPORT_SYMBOL(swap_info_log);
 
@@ -430,16 +461,49 @@ struct page * lookup_swap_cache(swp_entry_t entry)
 		INC_CACHE_INFO(find_success);
 		if (TestClearPageReadahead(page)) {
 			atomic_inc(&swapin_readahead_hits);
-			
-			if( get_custom_prefetch() != 0 ) {
-				atomic_inc(&my_swapin_readahead_hits);
+			atomic_inc(&prefetch_hits);
+			if (page_is_idle(page)) {
+				clear_page_idle(page);
+				INC_PREF_STAT(fetched_hit);
 			}
 		}
 	}
-
+	
 	INC_CACHE_INFO(find_total);
 	return page;
 }
+
+
+struct page * lookup_swap_cache_prof(swp_entry_t entry, unsigned long addr)
+{
+	struct page *page;
+	if ((unsigned long)falt_interest_start <= addr && addr <= (unsigned long) falt_interest_end)
+		INC_PREF_STAT(fault_interest);
+
+	page = find_get_page(swap_address_space(entry), entry.val);
+	
+	if( get_custom_prefetch() != 0 ) {
+		log_swap_trend(swp_offset(entry));
+	}
+
+	if (page) {
+		INC_CACHE_INFO(find_success);
+		if (TestClearPageReadahead(page)) {
+			atomic_inc(&swapin_readahead_hits);
+			atomic_inc(&prefetch_hits);
+			if ((unsigned long) pref_interest_start <= addr && addr <= (unsigned long)pref_interest_end)
+				INC_PREF_STAT(prefetch_interest_hit);
+			if (page_is_idle(page)) {
+				clear_page_idle(page);
+				INC_PREF_STAT(fetched_hit);
+			}
+		}
+	}
+	
+	INC_CACHE_INFO(find_total);
+	return page;
+}
+
 
 /* Codes related to prefetch buffer starts here*/
 unsigned long buffer_size = 8000;
@@ -694,6 +758,32 @@ struct page *read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
 	return retpage;
 }
 
+// set page to idle if it's newly fetched
+// used to distinguish between prefetch-local vs prefetch-remote pages
+struct page *read_swap_cache_async_prof(swp_entry_t entry, gfp_t gfp_mask,
+			struct vm_area_struct *vma, unsigned long addr, bool is_prefetch)
+{
+	bool page_was_allocated;
+	struct page *retpage = __read_swap_cache_async(entry, gfp_mask,
+			vma, addr, &page_was_allocated);
+
+	if (page_was_allocated){
+		if(get_prefetch_buffer_status() != 0){
+			add_page_to_buffer(entry, retpage);
+		}
+		swap_readpage(retpage);
+		if (is_prefetch) {
+			INC_PREF_STAT(fetched_pages);
+			set_page_idle(retpage);
+		}
+	}
+	if (is_prefetch) {
+		INC_PREF_STAT(total_target);
+	}
+
+	return retpage;
+}
+
 static unsigned long swapin_nr_pages(unsigned long offset)
 {
 	static unsigned long prev_offset;
@@ -783,12 +873,12 @@ struct page *swapin_readahead(swp_entry_t entry, gfp_t gfp_mask,
 			//blk_start_plug(&plug);
         		for (offset = start_offset; count <= mask; offset+= major_delta, count++) {
 		                /* Ok, do the async read-ahead now */
-                		page = read_swap_cache_async(swp_entry(swp_type(entry), offset),
-                                                gfp_mask, vma, addr);
+                		page = read_swap_cache_async_prof(swp_entry(swp_type(entry), offset),
+                                                gfp_mask, vma, addr, offset != entry_offset);
                 		if (!page)
                         		continue;
-                		if (offset != entry_offset)
-					SetPageReadahead(page);
+                		if (offset != entry_offset) 
+											SetPageReadahead(page);
 				page_cache_release(page);
 			}
 			//blk_finish_plug(&plug);
@@ -812,8 +902,8 @@ usual:
 	blk_start_plug(&plug);
 	for (offset = start_offset; offset <= end_offset ; offset++) {
 		/* Ok, do the async read-ahead now */
-		page = read_swap_cache_async(swp_entry(swp_type(entry), offset),
-						gfp_mask, vma, addr);
+		page = read_swap_cache_async_prof(swp_entry(swp_type(entry), offset),
+						gfp_mask, vma, addr, offset != entry_offset);
 		if (!page)
 			continue;
 		if (offset != entry_offset)
@@ -826,3 +916,17 @@ usual:
 skip:
 	return read_swap_cache_async(entry, gfp_mask, vma, addr);
 }
+
+asmlinkage int sys_set_pref_check(void *start, void *end) {
+	pref_interest_start = start;
+	pref_interest_end = end;
+	return 0;
+}
+
+asmlinkage int sys_set_falt_check(void *start, void *end) {
+	falt_interest_start = start;
+	falt_interest_end = end;
+	return 0;
+}
+
+

@@ -893,5 +893,8 @@ asmlinkage long sys_mlock2(unsigned long start, size_t len, int flags);
 asmlinkage int sys_is_session_create(const char *portal);
 
 asmlinkage int sys_is_request(struct page *page, int is_write);
+asmlinkage int sys_set_pref_check(void *start, void *end);
+asmlinkage int sys_set_falt_check(void *start, void *end);
+asmlinkage int sys_reset_swap_stat(void);
 
 #endif
