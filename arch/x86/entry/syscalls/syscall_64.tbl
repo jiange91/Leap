@@ -337,9 +337,10 @@
 327	common	is_request		sys_is_request
 
 # set page addr in interest
-328 	common 	set_pref_check		sys_set_pref_check
+328 common 	set_pref_check		sys_set_pref_check
 329	common	set_falt_check		sys_set_falt_check
-330 	common	reset_swap_stat		sys_reset_swap_stat
+330 common	reset_swap_stat		sys_reset_swap_stat
+331 common  get_fault_hist    sys_get_fault_hist
 
 #
 # x32-specific system call numbers start at 512 to avoid cache impact

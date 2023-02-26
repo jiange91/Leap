@@ -16,13 +16,17 @@ MODULE_DESCRIPTION("Kernel module to enable/disable Leap components");
 char *cmd;
 unsigned long tried = 0;
 char *process_name;
-int wds=32;
+int wds = 32;
+int fhs = (4 << 10);
+
 MODULE_PARM_DESC(cmd, "A string, for prefetch load/unload command");
 module_param(cmd, charp, 0000);
 MODULE_PARM_DESC(process_name, "A string, for process name");
 module_param(process_name, charp, 0000);
 MODULE_PARM_DESC(wds, "A int, for prefethc window size");
 module_param(wds, int, 0);
+MODULE_PARM_DESC(fhs, "A int, for fault history size");
+module_param(fhs, int, 0);
 
 static int get_pid_for_process(void) {
 	int pid = -1;
@@ -67,6 +71,7 @@ static void usage(void) {
         printk(KERN_INFO "To disable prefetching: insmod leap_functionality.ko cmd=\"readahead\"\n");
         printk(KERN_INFO "To have swap info log: insmod leap_functionality.ko cmd=\"log\"\n");
 	printk(KERN_INFO "To check if current swap cache activates prefetch buffer: insmod leap_functionality.ko cmd=\"pbuf\"\n");
+	printk(KERN_INFO "To set fault history buffer: insmod leap_functionality.ko cmd=\"fbuf\" fhs=\"N\"\n");
 }
 
 static int __init leap_functionality_init(void) {	
@@ -90,6 +95,11 @@ static int __init leap_functionality_init(void) {
 	}
 	else if (strcmp(cmd, "pbuf") == 0) {
 		printk("prefetch buffer: %s\n", (get_prefetch_buffer_status() != 0) ? "active" : "inactive");
+		return 0;
+	}
+	else if (strcmp(cmd, "faulthist") == 0) {
+		printk("fault history initialization: %d\n", fhs);
+		init_fault_history(fhs);
 		return 0;
 	}
 	else
