@@ -20,6 +20,7 @@
 #include <linux/migrate.h>
 #include <linux/string.h>
 
+#include <linux/vmalloc.h>
 #include <linux/page_idle.h>
 #include <asm/pgtable.h>
 
@@ -198,8 +199,8 @@ void init_fault_history(int size) {
 		vfree(fault_history.hits);
 	}
 
-	fault_history.faults = (unsigned long *) vzalloc(size * sizeof(unsigned long), GFP_USER);
-	fault_history.hits = (char *) vzalloc(size * sizeof(char), GFP_USER);
+	fault_history.faults = (unsigned long *) vzalloc(size * sizeof(unsigned long));
+	fault_history.hits = (char *) vzalloc(size * sizeof(char));
 	fault_history.head = 0;
 	fault_history.max_size = size;
 	printk("fault history initiated with size %d", fault_history.max_size);

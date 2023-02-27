@@ -36,6 +36,7 @@ extern void set_custom_prefetch(unsigned long val);
 extern unsigned long get_custom_prefetch( void );
 extern void init_swap_trend(int size);
 extern void swap_info_log(void);
+extern void init_fault_history(int size);
 extern void activate_prefetch_buffer(unsigned long val);
 extern unsigned long get_prefetch_buffer_status( void );
 extern void prefetch_buffer_init(unsigned long _size);

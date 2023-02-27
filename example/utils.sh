@@ -24,3 +24,8 @@ check_pbuf() {
 	sudo rmmod leap_functionality
 	sudo insmod leap_functionality.ko cmd=pbuf
 }
+
+init_fault_buf() {
+	sudo rmmod leap_functionality
+	sudo insmod leap_functionality.ko cmd=faulthist fhs=$1
+}
