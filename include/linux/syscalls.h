@@ -896,6 +896,6 @@ asmlinkage int sys_is_request(struct page *page, int is_write);
 asmlinkage int sys_set_pref_check(void *start, void *end);
 asmlinkage int sys_set_falt_check(void *start, void *end);
 asmlinkage int sys_reset_swap_stat(void);
-asmlinkage int sys_get_fault_hist(unsigned long __user **fs, char __user **hs);
+asmlinkage int sys_get_fault_hist(unsigned long __user *fs, char __user *hs);
 
 #endif

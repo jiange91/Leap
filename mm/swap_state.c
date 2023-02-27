@@ -162,9 +162,9 @@ asmlinkage int sys_reset_swap_stat(void) {
 	return 0;
 }
 
-asmlinkage int sys_get_fault_hist(unsigned long __user **fs, char __user **hs) {
-	put_user(fault_history.faults, fs);
-	put_user(fault_history.hits, hs);
+asmlinkage int sys_get_fault_hist(unsigned long __user *fs, char __user *hs) {
+	copy_to_user(fs, fault_history.faults, sizeof(unsigned long) * fault_history.head);
+	copy_to_user(hs, fault_history.hits, sizeof(char) * fault_history.head);
 	return fault_history.head;
 }
 
