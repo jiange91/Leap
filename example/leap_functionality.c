@@ -104,7 +104,7 @@ static int __init leap_functionality_init(void) {
 		return 0;
 	}
 	else if (strcmp(cmd, "cfbuf") == 0) {
-		printk("Total %d, check first %d fault history:\n", fault_history.head, fhs);
+		printk("Total %d, check first %d fault history:\n", atomic_read(&fault_history.head), fhs);
 		check_fault_history(fhs);
 		return 0;
 	}
