@@ -111,7 +111,7 @@ struct swap_trend {
 	struct swap_entry *history;
 };
 
-struct fault_history_t fault_history = { 0, 0, NULL, NULL };
+struct fault_history_t fault_history = { ATOMIC_INIT(0), ATOMIC_INIT(0), NULL, NULL };
 EXPORT_SYMBOL(fault_history);
 
 static struct swap_trend trend_history;
@@ -151,7 +151,7 @@ void init_stat(void) {
         atomic_set(&trend_found, 0);
 	atomic_set(&swapin_readahead_hits, 4);
 
-	fault_history.head = 0;
+	atomic_set(&fault_history.head, 0);
 }
 
 asmlinkage int sys_reset_swap_stat(void) {
@@ -160,9 +160,10 @@ asmlinkage int sys_reset_swap_stat(void) {
 }
 
 asmlinkage int sys_get_fault_hist(unsigned long __user *fs, char __user *hs) {
-	copy_to_user(fs, fault_history.faults, sizeof(unsigned long) * fault_history.head);
-	copy_to_user(hs, fault_history.hits, sizeof(char) * fault_history.head);
-	return fault_history.head;
+	int s = atomic_read(&fault_history.head);
+	copy_to_user(fs, fault_history.faults, sizeof(unsigned long) * s);
+	copy_to_user(hs, fault_history.hits, sizeof(char) * s);
+	return s;
 }
 
 void init_swap_trend(int size) {
@@ -180,12 +181,9 @@ void init_swap_trend(int size) {
 EXPORT_SYMBOL(init_swap_trend);
 
 void init_fault_history(int size) {
-	if (fault_history.max_size >= size && size != 0) {
+	if (atomic_read(&fault_history.max_size) >= size) {
 		// reuse current history, clear logs
-		printk("reuse existing fault history, clear previous %d logs\n", fault_history.head);
-		memset(fault_history.faults, 0, fault_history.head * sizeof(unsigned long));
-		memset(fault_history.hits, 0, fault_history.head * sizeof(char));
-		fault_history.head = 0;
+		atomic_set(&fault_history.head, 0);
 		return;
 	}
 
@@ -198,24 +196,27 @@ void init_fault_history(int size) {
 
 	fault_history.faults = (unsigned long *) vzalloc(size * sizeof(unsigned long));
 	fault_history.hits = (char *) vzalloc(size * sizeof(char));
-	fault_history.head = 0;
-	fault_history.max_size = size;
-	printk("fault history initiated with size %d", fault_history.max_size);
+	atomic_set(&fault_history.head, 0);
+	atomic_set(&fault_history.max_size, size);
+	printk("fault history initiated with size %d", size);
 }
 EXPORT_SYMBOL(init_fault_history);
 
 // discard exceeding entries
 void log_fault_find(unsigned long addr, char find_success) {
-	if (fault_history.head < fault_history.max_size) {
-		fault_history.faults[fault_history.head] = addr;
-		fault_history.hits[fault_history.head] = find_success;
-		fault_history.head ++;
+	int h = atomic_read(&fault_history.head);
+	int s = atomic_read(&fault_history.max_size);
+	if (h < s) {
+		fault_history.faults[h] = addr;
+		fault_history.hits[h] = find_success;
+		atomic_set(&fault_history.head, h+1);
 	}
 }
 
 void check_fault_history(int size) {
 	int i;
-	for (i = 0; i < size && i < fault_history.max_size; i++) {
+	int h = atomic_read(&fault_history.head);
+	for (i = 0; i < size && i < h; i++) {
 		printk("%lu %c\n", fault_history.faults[i], fault_history.hits[i]);
 	}
 }

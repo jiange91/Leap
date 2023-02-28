@@ -30,8 +30,8 @@ struct user_struct;
 struct writeback_control;
 struct bdi_writeback;
 struct fault_history_t {
-	int head;
-	int max_size;
+	atomic_t head;
+	atomic_t max_size;
 	unsigned long *faults;
 	char *hits;
 };
