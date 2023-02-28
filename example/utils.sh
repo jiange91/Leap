@@ -5,9 +5,9 @@ get_pref_log() {
 	sudo insmod leap_functionality.ko cmd=log
 }
 
-linux_runahead() {
+linux_readahead() {
 	sudo rmmod leap_functionality
-	sudo insmod leap_functionality.ko cmd=runahead
+	sudo insmod leap_functionality.ko cmd=readahead
 }
 
 leap_pref() {
