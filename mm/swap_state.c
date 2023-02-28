@@ -111,12 +111,7 @@ struct swap_trend {
 	struct swap_entry *history;
 };
 
-struct {
-	int head;
-	int max_size;
-	unsigned long *faults;
-	char *hits;
-} fault_history = { 0, 0, NULL, NULL };
+struct fault_history_t fault_history = { 0, 0, NULL, NULL };
 EXPORT_SYMBOL(fault_history);
 
 static struct swap_trend trend_history;
@@ -155,6 +150,8 @@ void init_stat(void) {
         atomic_set(&swapin_readahead_entry, 0);
         atomic_set(&trend_found, 0);
 	atomic_set(&swapin_readahead_hits, 4);
+
+	fault_history.head = 0;
 }
 
 asmlinkage int sys_reset_swap_stat(void) {
@@ -215,6 +212,14 @@ void log_fault_find(unsigned long addr, char find_success) {
 		fault_history.head ++;
 	}
 }
+
+void check_fault_history(int size) {
+	int i;
+	for (i = 0; i < size && i < fault_history.max_size; i++) {
+		printk("%lu %c\n", fault_history.faults[i], fault_history.hits[i]);
+	}
+}
+EXPORT_SYMBOL(check_fault_history);
 
 
 void log_swap_trend(unsigned long entry) {

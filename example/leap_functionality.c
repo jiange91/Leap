@@ -72,6 +72,7 @@ static void usage(void) {
         printk(KERN_INFO "To have swap info log: insmod leap_functionality.ko cmd=\"log\"\n");
 	printk(KERN_INFO "To check if current swap cache activates prefetch buffer: insmod leap_functionality.ko cmd=\"pbuf\"\n");
 	printk(KERN_INFO "To set fault history buffer: insmod leap_functionality.ko cmd=\"fbuf\" fhs=\"N\"\n");
+	printk(KERN_INFO "To inspect fault history buffer: insmod leap_functionality.ko cmd=\"cfbuf\" fhs=\"N\"\n");
 }
 
 static int __init leap_functionality_init(void) {	
@@ -97,9 +98,14 @@ static int __init leap_functionality_init(void) {
 		printk("prefetch buffer: %s\n", (get_prefetch_buffer_status() != 0) ? "active" : "inactive");
 		return 0;
 	}
-	else if (strcmp(cmd, "faulthist") == 0) {
+	else if (strcmp(cmd, "fbuf") == 0) {
 		printk("fault history initialization: %d\n", fhs);
 		init_fault_history(fhs);
+		return 0;
+	}
+	else if (strcmp(cmd, "cfbuf") == 0) {
+		printk("check first %d fault history:\n", fhs);
+		check_fault_history(fhs);
 		return 0;
 	}
 	else

@@ -29,7 +29,13 @@ struct file_ra_state;
 struct user_struct;
 struct writeback_control;
 struct bdi_writeback;
-
+struct fault_history_t {
+	int head;
+	int max_size;
+	unsigned long *faults;
+	char *hits;
+};
+extern struct fault_history_t fault_history;
 extern void set_process_id(unsigned long pid);
 extern unsigned long get_process_id( void );
 extern void set_custom_prefetch(unsigned long val);
@@ -37,6 +43,7 @@ extern unsigned long get_custom_prefetch( void );
 extern void init_swap_trend(int size);
 extern void swap_info_log(void);
 extern void init_fault_history(int size);
+extern void check_fault_history(int size);
 extern void activate_prefetch_buffer(unsigned long val);
 extern unsigned long get_prefetch_buffer_status( void );
 extern void prefetch_buffer_init(unsigned long _size);
