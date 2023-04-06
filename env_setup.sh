@@ -6,8 +6,8 @@ sudo apt install software-properties-common -y
 sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
 sudo apt update
 sudo apt install gcc-9 g++-9 -y
-sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 50
-sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 50
+# sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 50
+# sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 50
 
 #install make tools
 sudo apt remove --purge --auto-remove cmake -y
@@ -32,9 +32,4 @@ sudo ./configure --enable-optimizations --with-lto
 sudo make -j32
 sudo make altinstall
 sudo /usr/local/bin/python3.8 -m pip install --upgrade pip setuptools wheel
-cd /usr/bin
-sudo unlink python
-sudo ln -s /usr/local/bin/python3.8 python
-cd ~
-python --version
 
