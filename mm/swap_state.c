@@ -536,11 +536,12 @@ struct page * lookup_swap_cache(swp_entry_t entry)
 struct page * lookup_swap_cache_prof(swp_entry_t entry, unsigned long addr)
 {
 	struct page *page;
-	if ((unsigned long)falt_interest_start <= addr && addr <= (unsigned long) falt_interest_end)
-		INC_PREF_STAT(fault_interest);
 
 	page = find_get_page(swap_address_space(entry), entry.val);
 	log_fault_find(addr, page != NULL);
+
+	if (!page && (unsigned long)falt_interest_start <= addr && addr <= (unsigned long) falt_interest_end)
+		INC_PREF_STAT(fault_interest);
 	
 	if( get_custom_prefetch() != 0 ) {
 		log_swap_trend(swp_offset(entry));
